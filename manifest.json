@@ -1,0 +1,24 @@
+{
+  "name": "CASH MAKER",
+  "short_name": "CashMaker",
+  "description": "BTC Signal Intelligence — Profesyonel sinyal ve analiz aracı",
+  "start_url": "/cash-maker.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1c1c1e",
+  "theme_color": "#1c1c1e",
+  "icons": [
+    {
+      "src": "cm-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "cm-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

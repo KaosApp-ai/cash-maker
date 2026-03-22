@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cash Maker">
+<meta name="theme-color" content="#1c1c1e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="cm-icon-192.png">
+<title>CASH MAKER — BTC Signal Intelligence</title>
+<script>
+if (navigator.locks) {
+  navigator.locks.request('cash_maker_keepalive', { mode: 'exclusive' }, () => new Promise(() => {}));
+}
+</script>
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#1c1c1e;--card:rgba(38,38,42,.95);--card2:rgba(50,50,55,.8);
+  --green:#34c759;--red:#ff3b30;--blue:#007aff;--yellow:#ff9500;--orange:#ff6b00;--purple:#af52de;--cyan:#32ade6;
+  --text:rgba(255,255,255,.88);--text2:rgba(255,255,255,.5);--text3:rgba(255,255,255,.25);
+  --border:rgba(255,255,255,.1);--glass:rgba(255,255,255,.04);
+  --r:14px;--glow-green:0 0 20px rgba(52,199,89,.3);--glow-red:0 0 20px rgba(255,59,48,.3);
+  --shadow:0 2px 12px rgba(0,0,0,.25)
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.mono{font-family:'SF Mono','Menlo','Monaco',monospace}
+.green{color:var(--green)}.red{color:var(--red)}.blue{color:var(--blue)}.yellow{color:var(--yellow)}.orange{color:var(--orange)}.purple{color:var(--purple)}
+
+/* Header */
+.header{background:rgba(28,28,30,.9);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);padding:12px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.logo{font-size:20px;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,#007aff,#34c759);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.conn-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.conn-dot.on{background:var(--green);box-shadow:0 0 6px rgba(52,199,89,.5)}.conn-dot.off{background:var(--red)}
+.price-display{font-size:22px;font-weight:700;letter-spacing:-1px;transition:color .3s;color:var(--text)}
+.stat{display:flex;flex-direction:column;align-items:center;gap:1px}
+.stat-label{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.stat-value{font-size:13px;font-weight:600}
+
+/* Controls */
+.controls{background:rgba(44,44,48,.85);backdrop-filter:blur(12px);padding:8px 24px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;border-bottom:1px solid var(--border)}
+.ctrl-group{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)}
+.ctrl-select{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:500;outline:none}
+.ctrl-select:focus{border-color:var(--blue)}
+.ctrl-input{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12px;font-family:'SF Mono',monospace;text-align:center;width:55px;outline:none}
+
+/* Layout */
+.container{display:grid;grid-template-columns:1fr 380px;gap:12px;padding:12px 20px;max-width:1900px;margin:0 auto}
+.card{background:var(--card);border-radius:var(--r);padding:14px;border:1px solid var(--border);box-shadow:var(--shadow);cursor:grab;transition:box-shadow .2s}
+.card.dragging{box-shadow:0 8px 30px rgba(0,0,0,.15);opacity:.9;cursor:grabbing;z-index:50}
+.card-title{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;cursor:grab}
+
+/* Signal Alert */
+.signal-alert{border-radius:16px;padding:24px;text-align:center;border:2px solid var(--border);background:var(--glass);transition:all .4s;box-shadow:var(--shadow)}
+.signal-long{border-color:var(--green);background:rgba(52,199,89,.08);box-shadow:var(--glow-green)}
+.signal-short{border-color:var(--red);background:rgba(255,59,48,.08);box-shadow:var(--glow-red)}
+.signal-dir{font-size:36px;font-weight:900;letter-spacing:-1px}
+.signal-score{font-size:48px;font-weight:900;letter-spacing:-2px}
+
+/* Levels Panel */
+.level-row{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;margin:3px 0;font-size:12px}
+.level-support{background:rgba(52,199,89,.08);border-left:3px solid var(--green)}
+.level-resistance{background:rgba(255,59,48,.08);border-left:3px solid var(--red)}
+.level-target{background:rgba(0,122,255,.06);border-left:3px solid var(--blue)}
+.level-price{font-weight:700;font-family:'SF Mono',monospace}
+.level-label{color:var(--text2);font-size:11px}
+.level-dist{font-size:11px;font-weight:600}
+
+/* Calendar */
+.cal-event{display:flex;align-items:center;gap:8px;padding:7px;border-radius:8px;margin-bottom:3px;font-size:11px}
+.cal-high{background:rgba(255,59,48,.06);border-left:3px solid var(--red)}
+.cal-med{background:rgba(255,149,0,.06);border-left:3px solid var(--orange)}
+.cal-low{background:rgba(0,122,255,.05);border-left:3px solid var(--blue)}
+.no-trade-zone{background:rgba(255,59,48,.06);border:1px dashed var(--red);border-radius:10px;padding:10px;margin-bottom:8px;font-size:12px;text-align:center}
+
+/* Indicators Grid */
+.ind-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ind-item{background:var(--glass);border-radius:10px;padding:8px;text-align:center;border:1px solid var(--border)}
+.ind-name{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.ind-value{font-size:14px;font-weight:700;margin-top:2px}
+
+/* Trend Info */
+.trend-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px}
+.trend-up{background:rgba(52,199,89,.12);color:var(--green)}
+.trend-down{background:rgba(255,59,48,.12);color:var(--red)}
+.trend-neutral{background:rgba(0,0,0,.05);color:var(--text2)}
+
+/* Log */
+.log-area{max-height:200px;overflow-y:auto;font-size:11px;line-height:1.7;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.1) transparent}
+.log-area::-webkit-scrollbar{width:3px}.log-area::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:2px}
+
+/* Range Buttons */
+.range-btn{background:var(--glass);color:var(--text2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
+.range-btn:hover{background:rgba(255,255,255,.08)}
+.range-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* Funding/OI */
+.metric-bar{height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;margin:4px 0}
+.metric-fill{height:100%;border-radius:3px;transition:width .4s}
+
+/* Responsive */
+@media(max-width:1100px){.container{grid-template-columns:1fr}}
+
+/* Alert Animation */
+@keyframes signalPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
+.signal-active{animation:signalPulse 1.5s ease-in-out infinite}
+
+/* Projection Arrow */
+.proj-arrow{font-size:16px;font-weight:900}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <span class="logo">CASH MAKER</span>
+  <div style="display:flex;align-items:center;gap:5px">
+    <span class="conn-dot off" id="connDot"></span>
+    <span class="mono" style="font-size:11px;color:var(--text2)" id="connStatus">Bağlantı Yok</span>
+  </div>
+  <span class="price-display mono" id="livePrice">--</span>
+  <div class="stat"><span class="stat-label">24s Değişim</span><span class="stat-value mono" id="change24h">--%</span></div>
+  <div class="stat"><span class="stat-label">Trend (4H)</span><span id="trendBadge" class="trend-badge trend-neutral">--</span></div>
+  <div class="stat"><span class="stat-label">Volatilite</span><span class="stat-value mono" id="volatility">--</span></div>
+  <div class="stat"><span class="stat-label">Analiz</span><span class="stat-value mono" id="analysisCount">0</span></div>
+  <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+    <span id="newsAlert" style="font-size:12px"></span>
+    <button class="range-btn" onclick="app.toggleSound()" id="btnSound" title="Ses Açık/Kapalı">🔔</button>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <div class="ctrl-group">
+    <span style="color:var(--blue)">⏱</span> Grafik:
+    <select id="tfSelect" class="ctrl-select" onchange="app.switchTF(this.value)">
+      <option value="1m">1dk</option>
+      <option value="5m">5dk</option>
+      <option value="15m" selected>15dk</option>
+      <option value="1h">1sa</option>
+      <option value="4h">4sa</option>
+      <option value="1d">1G</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <span style="color:var(--yellow)">🎯</span> Min Güven:
+    <input type="number" id="confInput" class="ctrl-input" value="52" min="20" max="100" onchange="app.setConfidence(+this.value)">
+  </div>
+  <div class="ctrl-group">
+    <span style="color:var(--orange)">🔥</span> Kaldıraç:
+    <input type="number" id="levInput" class="ctrl-input" value="25" min="1" max="250" onchange="app.setLeverage(+this.value)">
+    <span style="color:var(--yellow);font-weight:700">x</span>
+  </div>
+  <div class="ctrl-group">
+    <span style="color:var(--green)">↕</span> Yön:
+    <select id="dirSelect" class="ctrl-select" onchange="app.setDirection(this.value)">
+      <option value="BOTH">LONG + SHORT</option>
+      <option value="LONG">Sadece LONG</option>
+      <option value="SHORT">Sadece SHORT</option>
+    </select>
+  </div>
+  <div style="width:1px;height:20px;background:var(--border)"></div>
+  <div class="ctrl-group" style="color:var(--purple)">
+    <span>📊</span> Onay: <span class="mono" id="confirmStatus">0/3</span>
+  </div>
+  <div class="ctrl-group">
+    <span>⏱</span> <span class="mono" id="analysisTimer">--</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="container">
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <!-- Chart -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div class="card-title" style="margin-bottom:0">BTC/USDT</div>
+        <div style="display:flex;gap:4px">
+          <button class="range-btn" onclick="app.switchTF('1m')">1dk</button>
+          <button class="range-btn" onclick="app.switchTF('5m')">5dk</button>
+          <button class="range-btn active" onclick="app.switchTF('15m')">15dk</button>
+          <button class="range-btn" onclick="app.switchTF('1h')">1sa</button>
+          <button class="range-btn" onclick="app.switchTF('4h')">4sa</button>
+          <button class="range-btn" onclick="app.switchTF('1d')">1G</button>
+        </div>
+      </div>
+      <div id="chartContainer" style="min-height:420px"></div>
+    </div>
+
+    <!-- Indicators -->
+    <div class="card">
+      <div class="card-title">Teknik Göstergeler</div>
+      <div class="ind-grid" id="indGrid"></div>
+    </div>
+
+    <!-- Signal Details -->
+    <div class="card">
+      <div class="card-title">Sinyal Detayları</div>
+      <div id="signalReasons" style="font-size:12px;color:var(--text2)">Analiz bekleniyor...</div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title">Sinyal Logları</div>
+      <div class="log-area" id="logArea"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <!-- Signal Alert -->
+    <div class="card">
+      <div class="card-title">AKTİF SİNYAL</div>
+      <div class="signal-alert" id="signalBox">
+        <div style="font-size:11px;color:var(--text2)">Güven Skoru</div>
+        <div class="signal-score mono" id="signalScore">--</div>
+        <div class="signal-dir" id="signalDir">BEKLE</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px" id="signalTime">--</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)" id="signalConfirm">Onay: 0/3</div>
+      </div>
+    </div>
+
+    <!-- Price Targets -->
+    <div class="card">
+      <div class="card-title">FİYAT HEDEFLERİ</div>
+      <div id="priceTargets">
+        <div style="text-align:center;padding:16px;color:var(--text2);font-size:12px">Sinyal bekleniyor...</div>
+      </div>
+    </div>
+
+    <!-- Support/Resistance -->
+    <div class="card">
+      <div class="card-title">DESTEK / DİRENÇ SEVİYELERİ</div>
+      <div id="srLevels">
+        <div style="text-align:center;padding:16px;color:var(--text2);font-size:12px">Hesaplanıyor...</div>
+      </div>
+    </div>
+
+    <!-- Market Data -->
+    <div class="card">
+      <div class="card-title">PİYASA VERİLERİ</div>
+      <div id="marketData" style="font-size:12px"></div>
+    </div>
+
+    <!-- Whale Activity -->
+    <div class="card">
+      <div class="card-title">BALİNA HAREKETLERİ 🐋</div>
+      <div id="whalePanel" style="font-size:12px">
+        <div style="text-align:center;padding:12px;color:var(--text2)">Yükleniyor...</div>
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="card">
+      <div class="card-title">EKONOMİK TAKVİM 📅</div>
+      <div id="noTradeAlert"></div>
+      <div id="calendarEvents" style="max-height:250px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== CONFIG =====================
+const CFG = {
+  TF: '15m',
+  MIN_CONFIDENCE: 52,
+  LEVERAGE: 25,
+  DIRECTION: 'BOTH',
+  NEWS_BUFFER_MINUTES: 45,
+  SOUND_ENABLED: true,
+  SIGNAL_CHECK_MS: 2000
+};
+
+// ===================== DATA API (Binance) =====================
+class DataAPI {
+  constructor() {
+    this.ws = null;
+    this.price = 0;
+    this.connected = false;
+    this._lastDataTime = 0;
+    this.onPrice = null;
+    this.onKline = null;
+    this.onConnect = null;
+    this.onDisconnect = null;
+    this.wsRetries = 0;
+  }
+
+  connect() {
+    const tf = CFG.TF;
+    try { if (this.ws) { this.ws.onclose = null; this.ws.close(); } } catch(e) {}
+    // MEXC WS önce dene, 3sn içinde bağlanmazsa Binance'e geç
+    this._tryMexcFirst(tf);
+  }
+
+  _tryMexcFirst(tf) {
+    let opened = false;
+    try {
+      this.ws = new WebSocket('wss://contract.mexc.com/edge');
+    } catch(e) {
+      this._connectBinance(tf);
+      return;
+    }
+    const fallback = setTimeout(() => {
+      if (!opened) { try { this.ws.close(); } catch(e) {} this._connectBinance(tf); }
+    }, 3000);
+
+    this.ws.onopen = () => {
+      opened = true; clearTimeout(fallback);
+      this.connected = true; this._lastDataTime = Date.now(); this.wsRetries = 0;
+      this._source = 'MEXC';
+      this.ws.send(JSON.stringify({ method:'sub.ticker', param:{ symbol:'BTC_USDT' } }));
+      this.ws.send(JSON.stringify({ method:'sub.kline', param:{ symbol:'BTC_USDT', interval: this._mexcTF(tf) } }));
+      this._pingInterval = setInterval(() => { if(this.ws&&this.ws.readyState===1) this.ws.send(JSON.stringify({method:'ping'})); }, 20000);
+      if (this.onConnect) this.onConnect();
+    };
+    this.ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        this._lastDataTime = Date.now();
+        if (msg.channel==='push.ticker'&&msg.data) {
+          this.price = +(msg.data.lastPrice||msg.data.fairPrice||0);
+          if (this.onPrice) this.onPrice(this.price);
+        }
+        if (msg.channel==='push.kline'&&msg.data) {
+          const k = msg.data;
+          if (this.onKline) this.onKline({ time:Math.floor(k.t/1), open:+k.o, high:+k.h, low:+k.l, close:+k.c, volume:+k.v||0 });
+        }
+      } catch(err) {}
+    };
+    this.ws.onclose = () => {
+      if(this._pingInterval) clearInterval(this._pingInterval);
+      this.connected = false;
+      if (this.onDisconnect) this.onDisconnect();
+      if (!opened) return;
+      this._connectBinance(tf);
+    };
+    this.ws.onerror = () => {};
+  }
+
+  _mexcTF(tf) {
+    const map = {'1m':'Min1','5m':'Min5','15m':'Min15','1h':'Min60','4h':'Hour4','1d':'Day1'};
+    return map[tf] || 'Min15';
+  }
+
+  _connectBinance(tf) {
+    this._source = 'Binance';
+    this.ws = new WebSocket(`wss://fstream.binance.com/stream?streams=btcusdt@kline_${tf}/btcusdt@aggTrade`);
+
+    this.ws.onopen = () => {
+      this.connected = true;
+      this._lastDataTime = Date.now();
+      this.wsRetries = 0;
+      if (this.onConnect) this.onConnect();
+    };
+
+    this.ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        const d = msg.data || msg;
+        this._lastDataTime = Date.now();
+
+        if (d.e === 'aggTrade') {
+          this.price = parseFloat(d.p);
+          if (this.onPrice) this.onPrice(this.price);
+          return;
+        }
+        if (d.k) {
+          this.price = parseFloat(d.k.c);
+          const kline = {
+            time: Math.floor(d.k.t / 1000),
+            open: +d.k.o, high: +d.k.h, low: +d.k.l, close: +d.k.c,
+            volume: +d.k.v
+          };
+          if (this.onPrice) this.onPrice(this.price);
+          if (this.onKline) this.onKline(kline);
+        }
+      } catch(err) {}
+    };
+
+    this.ws.onclose = () => {
+      this.connected = false;
+      if (this.onDisconnect) this.onDisconnect();
+      this.wsRetries++;
+      const delay = Math.min(3000 * Math.pow(2, this.wsRetries), 30000);
+      setTimeout(() => this.connect(), delay);
+    };
+    this.ws.onerror = () => {};
+  }
+
+  reconnect() {
+    try { if (this.ws) { this.ws.onclose = null; this.ws.close(); } } catch(e) {}
+    this.connect();
+  }
+
+  async getKlines(tf, limit = 500) {
+    try {
+      const url = `https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${tf}&limit=${limit}`;
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 8000);
+      const res = await fetch(url, { signal: c.signal });
+      clearTimeout(t);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        return data.map(k => ({
+          time: Math.floor(k[0] / 1000),
+          open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5]
+        }));
+      }
+    } catch(e) {}
+    return [];
+  }
+
+  async getFundingRate() {
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 5000);
+      const res = await fetch('https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=1', { signal: c.signal });
+      clearTimeout(t);
+      const data = await res.json();
+      return data[0] ? +data[0].fundingRate : null;
+    } catch(e) { return null; }
+  }
+
+  async getOpenInterest() {
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 5000);
+      const res = await fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT', { signal: c.signal });
+      clearTimeout(t);
+      const data = await res.json();
+      return data.openInterest ? +data.openInterest : null;
+    } catch(e) { return null; }
+  }
+
+  async getLongShortRatio() {
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 5000);
+      const res = await fetch('https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=15m&limit=1', { signal: c.signal });
+      clearTimeout(t);
+      const data = await res.json();
+      return data[0] ? +data[0].longShortRatio : null;
+    } catch(e) { return null; }
+  }
+
+  async getWhaleActivity() {
+    // Binance büyük işlemler (takerlongshortRatio = büyük trader'ların pozisyonları)
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 5000);
+      const res = await fetch('https://fapi.binance.com/futures/data/takerlongshortRatio?symbol=BTCUSDT&period=15m&limit=5', { signal: c.signal });
+      clearTimeout(t);
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) return null;
+
+      // Taker Buy/Sell oranı — büyük alıcılar mı satıcılar mı ağırlıklı
+      const latest = data[0];
+      const buyRatio = +latest.buyVol / (+latest.buyVol + +latest.sellVol);
+      const sellRatio = +latest.sellVol / (+latest.buyVol + +latest.sellVol);
+
+      // Trend: son 5 periyotta alım artıyor mu azalıyor mu
+      const buyTrend = data.map(d => +d.buyVol / (+d.buyVol + +d.sellVol));
+      const increasing = buyTrend[0] > buyTrend[buyTrend.length-1];
+
+      return {
+        buyRatio, sellRatio,
+        buyVol: +latest.buyVol,
+        sellVol: +latest.sellVol,
+        totalVol: +latest.buyVol + +latest.sellVol,
+        trend: increasing ? 'ALIM_ARTIYOR' : 'SATIM_ARTIYOR',
+        signal: buyRatio > 0.55 ? 'LONG' : sellRatio > 0.55 ? 'SHORT' : 'NÖTR',
+        history: data
+      };
+    } catch(e) { return null; }
+  }
+
+  async getTopTraderPositions() {
+    // Top trader'ların long/short pozisyon oranı
+    try {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 5000);
+      const res = await fetch('https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=BTCUSDT&period=15m&limit=3', { signal: c.signal });
+      clearTimeout(t);
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) return null;
+      return {
+        longRatio: (+data[0].longAccount * 100).toFixed(1),
+        shortRatio: (+data[0].shortAccount * 100).toFixed(1),
+        ratio: +data[0].longShortRatio
+      };
+    } catch(e) { return null; }
+  }
+}
+
+// ===================== INDICATORS =====================
+class Indicators {
+  static SMA(data, period) {
+    const r = [];
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) { r.push(null); continue; }
+      let s = 0; for (let j = i - period + 1; j <= i; j++) s += data[j];
+      r.push(s / period);
+    }
+    return r;
+  }
+  static EMA(data, period) {
+    const k = 2/(period+1), r = [data[0]];
+    for (let i = 1; i < data.length; i++) r.push(data[i]*k + r[i-1]*(1-k));
+    return r;
+  }
+  static RSI(closes, period=14) {
+    if (closes.length < period+1) return { value: 50 };
+    const gains=[], losses=[];
+    for (let i=1; i<closes.length; i++) { const d=closes[i]-closes[i-1]; gains.push(d>0?d:0); losses.push(d<0?-d:0); }
+    let ag=gains.slice(0,period).reduce((a,b)=>a+b)/period;
+    let al=losses.slice(0,period).reduce((a,b)=>a+b)/period;
+    for (let i=period; i<gains.length; i++) { ag=(ag*(period-1)+gains[i])/period; al=(al*(period-1)+losses[i])/period; }
+    return { value: al===0 ? 100 : 100-100/(1+ag/al) };
+  }
+  static MACD(closes, fast=12, slow=26, signal=9) {
+    const ef=this.EMA(closes,fast), es=this.EMA(closes,slow);
+    const ml=ef.map((v,i)=>v-es[i]);
+    const sl=this.EMA(ml.slice(slow-1),signal);
+    const m=ml[ml.length-1], s=sl[sl.length-1];
+    return { macd:m, signal:s, histogram:m-s, prevHistogram:ml[ml.length-2]-(sl[sl.length-2]||0) };
+  }
+  static BollingerBands(closes, period=20, mult=2) {
+    const sma=this.SMA(closes,period); const last=sma[sma.length-1];
+    if (!last) return { upper:0, middle:0, lower:0 };
+    const slice=closes.slice(-period);
+    const std=Math.sqrt(slice.reduce((s,v)=>s+(v-last)**2,0)/period);
+    return { upper:last+mult*std, middle:last, lower:last-mult*std };
+  }
+  static ATR(klines, period=14) {
+    const trs=[];
+    for (let i=1; i<klines.length; i++) trs.push(Math.max(klines[i].high-klines[i].low, Math.abs(klines[i].high-klines[i-1].close), Math.abs(klines[i].low-klines[i-1].close)));
+    return trs.slice(-period).reduce((a,b)=>a+b)/period;
+  }
+  static Fibonacci(high, low) { const d=high-low; return { l236:high-d*.236, l382:high-d*.382, l500:high-d*.5, l618:high-d*.618 }; }
+  static VolumeAnalysis(volumes) {
+    if (volumes.length<20) return { ratio:1 };
+    const avg=volumes.slice(-20).reduce((a,b)=>a+b)/20;
+    return { ratio: volumes[volumes.length-1]/(avg||1) };
+  }
+  static SupportResistance(klines, period=100, tolerance=0.003) {
+    const slice=klines.slice(-period);
+    const sups=[], ress=[];
+    for (let i=2; i<slice.length-2; i++) {
+      const c=slice[i];
+      if (c.low<=slice[i-1].low&&c.low<=slice[i-2].low&&c.low<=slice[i+1].low&&c.low<=slice[i+2].low) sups.push(c.low);
+      if (c.high>=slice[i-1].high&&c.high>=slice[i-2].high&&c.high>=slice[i+1].high&&c.high>=slice[i+2].high) ress.push(c.high);
+    }
+    const cluster = (levels) => {
+      if (!levels.length) return [];
+      levels.sort((a,b)=>a-b);
+      const cls=[]; let g=[levels[0]];
+      for (let i=1; i<levels.length; i++) {
+        if ((levels[i]-g[0])/g[0]<tolerance) g.push(levels[i]);
+        else { cls.push({ price:g.reduce((a,b)=>a+b)/g.length, touches:g.length }); g=[levels[i]]; }
+      }
+      cls.push({ price:g.reduce((a,b)=>a+b)/g.length, touches:g.length });
+      return cls.filter(c=>c.touches>=2).sort((a,b)=>b.touches-a.touches);
+    };
+    return { supports: cluster(sups), resistances: cluster(ress) };
+  }
+  static TrendChannel(klines, period=50) {
+    const slice=klines.slice(-period);
+    if (slice.length<10) return null;
+    const n=slice.length;
+    const regress = (vals) => {
+      let sx=0,sy=0,sxx=0,sxy=0;
+      for (let i=0;i<n;i++){sx+=i;sy+=vals[i];sxx+=i*i;sxy+=i*vals[i];}
+      const slope=(n*sxy-sx*sy)/(n*sxx-sx*sx);
+      const intercept=(sy-slope*sx)/n;
+      return { slope, intercept, start: intercept, end: intercept+slope*(n-1) };
+    };
+    const highReg=regress(slice.map(k=>k.high));
+    const lowReg=regress(slice.map(k=>k.low));
+    const price=slice[slice.length-1].close;
+    const channelHigh=highReg.end;
+    const channelLow=lowReg.end;
+    const channelMid=(channelHigh+channelLow)/2;
+    const posInChannel=(price-channelLow)/(channelHigh-channelLow);
+    const trend=highReg.slope>0&&lowReg.slope>0?'UP':highReg.slope<0&&lowReg.slope<0?'DOWN':'RANGE';
+
+    // Çapraz çizgi noktaları (chart'a çizmek için time+value çiftleri)
+    const timeStep = slice.length > 1 ? slice[1].time - slice[0].time : 900; // candle interval in seconds
+    const highLinePoints = [];
+    const lowLinePoints = [];
+    const midLinePoints = [];
+    for (let i = 0; i < n; i++) {
+      highLinePoints.push({ time: slice[i].time, value: highReg.intercept + highReg.slope * i });
+      lowLinePoints.push({ time: slice[i].time, value: lowReg.intercept + lowReg.slope * i });
+      midLinePoints.push({ time: slice[i].time, value: (highReg.intercept + lowReg.intercept)/2 + (highReg.slope + lowReg.slope)/2 * i });
+    }
+    // Projeksiyon — 15 mum ileriye
+    for (let j = 1; j <= 15; j++) {
+      const futureTime = slice[n-1].time + timeStep * j;
+      highLinePoints.push({ time: futureTime, value: highReg.end + highReg.slope * j });
+      lowLinePoints.push({ time: futureTime, value: lowReg.end + lowReg.slope * j });
+      midLinePoints.push({ time: futureTime, value: (highReg.end + lowReg.end)/2 + (highReg.slope + lowReg.slope)/2 * j });
+    }
+
+    return {
+      trend, highReg, lowReg,
+      channelHigh, channelLow, channelMid, posInChannel,
+      startTime: slice[0].time, endTime: slice[n-1].time,
+      projHigh: highReg.end + highReg.slope*15,
+      projLow: lowReg.end + lowReg.slope*15,
+      // Çizgi noktaları
+      highLinePoints, lowLinePoints, midLinePoints
+    };
+  }
+  static Divergence(closes, period=14) {
+    if (closes.length < period*3) return { bullish: false, bearish: false };
+    const rsiVals=[];
+    for (let i=period+1; i<=closes.length; i++) {
+      rsiVals.push(Indicators.RSI(closes.slice(0,i), period).value);
+    }
+    const len=rsiVals.length;
+    if (len<20) return { bullish:false, bearish:false };
+    const priceLast=closes[closes.length-1], pricePrev=closes[closes.length-11];
+    const rsiLast=rsiVals[len-1], rsiPrev=rsiVals[len-11];
+    const bullish = priceLast<pricePrev && rsiLast>rsiPrev; // price lower low, RSI higher low
+    const bearish = priceLast>pricePrev && rsiLast<rsiPrev; // price higher high, RSI lower high
+    return { bullish, bearish };
+  }
+}
+
+// ===================== SIGNAL ENGINE (Pro) =====================
+class SignalEngine {
+  constructor() {
+    this._confirmations = [];
+    this._analysisCount = 0;
+  }
+
+  analyze(klines, htfKlines=null) {
+    if (klines.length < 200) return { direction:'BEKLE', score:0, reasons:['Yetersiz veri'] };
+    const slice = klines.slice(-200);
+    const closes = slice.map(k=>k.close);
+    const highs = slice.map(k=>k.high);
+    const lows = slice.map(k=>k.low);
+    const volumes = slice.map(k=>k.volume);
+    const price = closes[closes.length-1];
+
+    const sma20=Indicators.SMA(closes,20), sma50=Indicators.SMA(closes,50), sma200=Indicators.SMA(closes,200);
+    const rsi=Indicators.RSI(closes,14), macd=Indicators.MACD(closes);
+    const bb=Indicators.BollingerBands(closes), vol=Indicators.VolumeAnalysis(volumes);
+    const fib=Indicators.Fibonacci(Math.max(...highs.slice(-50)),Math.min(...lows.slice(-50)));
+    const sr=Indicators.SupportResistance(slice);
+    const channel=Indicators.TrendChannel(slice);
+    const divergence=Indicators.Divergence(closes);
+    const atr=Indicators.ATR(slice,14);
+    const s20=sma20[sma20.length-1], s50=sma50[sma50.length-1], s200=sma200[sma200.length-1];
+    if (!s50||!s200) return { direction:'BEKLE', score:0, reasons:['SMA hesaplanamadi'] };
+
+    let ls=0, ss=0, lr=[], sr_reasons=[];
+
+    // SMA Trend
+    if (price>s50&&s20>s50){ls+=15;lr.push('SMA50 üzeri yükseliş');}
+    if (price<s50&&s20<s50){ss+=15;sr_reasons.push('SMA50 altı düşüş');}
+    if (price>s200){ls+=5;lr.push('SMA200 üzeri');}
+    if (price<s200){ss+=5;sr_reasons.push('SMA200 altı');}
+
+    // RSI
+    if(rsi.value<40){ls+=15;lr.push(`RSI ${rsi.value.toFixed(0)} aşırı satım`);}
+    else if(rsi.value<55){ls+=10;lr.push(`RSI ${rsi.value.toFixed(0)} alım bölgesi`);}
+    else if(rsi.value<65)ls+=5;
+    if(rsi.value>65){ss+=15;sr_reasons.push(`RSI ${rsi.value.toFixed(0)} aşırı alım`);}
+    else if(rsi.value>50)ss+=8;
+    else if(rsi.value>40)ss+=5;
+
+    // MACD
+    if(macd.histogram>0&&macd.prevHistogram<=0){ls+=15;lr.push('MACD bullish crossover');}
+    else if(macd.histogram>0&&macd.histogram>macd.prevHistogram){ls+=10;lr.push('MACD momentum artıyor');}
+    if(macd.histogram<0&&macd.prevHistogram>=0){ss+=15;sr_reasons.push('MACD bearish crossover');}
+    else if(macd.histogram<0&&macd.histogram<macd.prevHistogram){ss+=10;sr_reasons.push('MACD negatif momentum');}
+
+    // BB
+    const bbPos=bb.upper!==bb.lower?(price-bb.lower)/(bb.upper-bb.lower):0.5;
+    if(bbPos<0.35){ls+=10;lr.push('BB alt bölge');}else if(bbPos<0.5)ls+=5;
+    if(bbPos>0.65){ss+=10;sr_reasons.push('BB üst bölge');}else if(bbPos>0.5)ss+=5;
+
+    // Volume
+    if(vol.ratio>1.2){ls+=10;ss+=10;lr.push('Yüksek hacim');sr_reasons.push('Yüksek hacim');}
+    else if(vol.ratio>0.7){ls+=7;ss+=7;}
+    ls+=8;ss+=8;
+
+    // Fibonacci
+    const fibL=[fib.l236,fib.l382,fib.l500,fib.l618];
+    if(fibL.some(l=>Math.abs(price-l)/price<0.008&&price>=l)){ls+=10;lr.push('Fibonacci destek');}
+    if(fibL.some(l=>Math.abs(price-l)/price<0.008&&price<=l)){ss+=10;sr_reasons.push('Fibonacci direnç');}
+
+    // Divergence (pro)
+    if(divergence.bullish){ls+=12;lr.push('RSI Bullish Divergence');}
+    if(divergence.bearish){ss+=12;sr_reasons.push('RSI Bearish Divergence');}
+
+    // Trend Channel
+    if(channel){
+      if(channel.trend==='UP'){ls+=8;lr.push('Yükselen kanal');}
+      if(channel.trend==='DOWN'){ss+=8;sr_reasons.push('Düşen kanal');}
+      if(channel.posInChannel<0.2){ls+=5;lr.push('Kanal alt bandı');}
+      if(channel.posInChannel>0.8){ss+=5;sr_reasons.push('Kanal üst bandı');}
+    }
+
+    // S/R proximity
+    for(const sup of sr.supports.slice(0,3)){
+      if(Math.abs(price-sup.price)/price<0.005){ls+=8;lr.push(`Destek ${sup.price.toFixed(0)} (${sup.touches}x)`);break;}
+    }
+    for(const res of sr.resistances.slice(0,3)){
+      if(Math.abs(price-res.price)/price<0.005){ss+=8;sr_reasons.push(`Direnç ${res.price.toFixed(0)} (${res.touches}x)`);break;}
+    }
+
+    // Whale data bonus (if available via app._whaleData)
+    if(typeof app !== 'undefined' && app._whaleData){
+      const w = app._whaleData;
+      if(w.signal==='LONG'){ls+=8;lr.push(`Balinalar ALIYOR (${(w.buyRatio*100).toFixed(0)}%)`);}
+      if(w.signal==='SHORT'){ss+=8;sr_reasons.push(`Balinalar SATIYOR (${(w.sellRatio*100).toFixed(0)}%)`);}
+    }
+    if(typeof app !== 'undefined' && app._topTraderData){
+      const tt = app._topTraderData;
+      // Contrarian: çoğunluk bir yöndeyse ters yön bonus
+      if(+tt.longRatio > 65){ss+=5;sr_reasons.push(`Top trader %${tt.longRatio} LONG (ters sinyal)`);}
+      if(+tt.shortRatio > 65){ls+=5;lr.push(`Top trader %${tt.shortRatio} SHORT (ters sinyal)`);}
+    }
+
+    // Multi-Timeframe Filter (4H)
+    let htfTrend = null;
+    if(htfKlines && htfKlines.length>=50){
+      const htfCloses=htfKlines.map(k=>k.close);
+      const htfSma20=Indicators.SMA(htfCloses,20);
+      const htfSma50=Indicators.SMA(htfCloses,50);
+      const h20=htfSma20[htfSma20.length-1], h50=htfSma50[htfSma50.length-1];
+      const htfRsi=Indicators.RSI(htfCloses);
+      if(h20&&h50){
+        if(h20>h50&&htfRsi.value>45){htfTrend='UP';ls+=10;lr.push('4H trend YUKARI');}
+        else if(h20<h50&&htfRsi.value<55){htfTrend='DOWN';ss+=10;sr_reasons.push('4H trend AŞAĞI');}
+        else htfTrend='RANGE';
+        // Penalty: sinyal ana trende karşıysa puan düş
+        if(htfTrend==='UP'&&ss>ls) ss-=10;
+        if(htfTrend==='DOWN'&&ls>ss) ls-=10;
+      }
+    }
+
+    this._analysisCount++;
+
+    let dir='BEKLE', score=0, reasons=[];
+    if(ls>=CFG.MIN_CONFIDENCE&&ls>ss+5){dir='LONG';score=Math.min(ls,100);reasons=lr;}
+    else if(ss>=CFG.MIN_CONFIDENCE&&ss>ls+5){dir='SHORT';score=Math.min(ss,100);reasons=sr_reasons;}
+    else return { direction:'BEKLE', score:Math.max(ls,ss), reasons:['Güven skoru yetersiz'], longScore:ls, shortScore:ss, indicators:{rsi:rsi.value,macd,bb,bbPos,sma20:s20,sma50:s50,sma200:s200,vol:vol.ratio,atr,channel,sr,divergence,fib,htfTrend} };
+
+    // Direction filter
+    if(CFG.DIRECTION!=='BOTH'&&dir!==CFG.DIRECTION) return { direction:'BEKLE', score, reasons:['Yön filtresi'], longScore:ls, shortScore:ss, indicators:{rsi:rsi.value,macd,bb,bbPos,sma20:s20,sma50:s50,sma200:s200,vol:vol.ratio,atr,channel,sr,divergence,fib,htfTrend} };
+
+    // TP/SL projections
+    const sl=dir==='LONG'?price-atr*1.5:price+atr*1.5;
+    const rpu=Math.abs(price-sl);
+
+    return {
+      direction:dir, score, reasons, price, atr, stopLoss:sl,
+      tp1:dir==='LONG'?price+rpu*1.5:price-rpu*1.5,
+      tp2:dir==='LONG'?price+rpu*2.5:price-rpu*2.5,
+      tp3:dir==='LONG'?price+rpu*4.0:price-rpu*4.0,
+      longScore:ls, shortScore:ss,
+      indicators:{rsi:rsi.value,macd,bb,bbPos,sma20:s20,sma50:s50,sma200:s200,vol:vol.ratio,atr,channel,sr,divergence,fib,htfTrend}
+    };
+  }
+
+  checkConfirmation(result) {
+    if(result.direction==='BEKLE') { this._confirmations=[]; return null; }
+    this._confirmations.push({ dir:result.direction, score:result.score, time:Date.now() });
+    // Remove old (>30s)
+    this._confirmations = this._confirmations.filter(c => Date.now()-c.time < 30000);
+    const same = this._confirmations.filter(c => c.dir===result.direction);
+    if(same.length>=3){
+      const last3=same.slice(-3);
+      if(last3[2].time-last3[0].time<=30000){
+        this._confirmations=[];
+        return { direction:result.direction, score:Math.round(last3.reduce((s,c)=>s+c.score,0)/3) };
+      }
+    }
+    return null;
+  }
+}
+
+// ===================== ECONOMIC CALENDAR =====================
+class EconomicCalendar {
+  constructor() { this.events = this.buildCalendar(); }
+  buildCalendar() {
+    const events = [
+      { date:'2026-03-24', time:'16:45', name:'S&P Global İmalat PMI', impact:'medium', desc:'Üretim sektörü' },
+      { date:'2026-03-25', time:'17:00', name:'Tüketici Güveni (CB)', impact:'high', desc:'Conference Board tüketici endeksi' },
+      { date:'2026-03-26', time:'15:30', name:'Dayanıklı Mal Siparişleri', impact:'high', desc:'Yatırım harcamaları' },
+      { date:'2026-03-27', time:'15:30', name:'Kişisel Gelir & Harcamalar', impact:'high', desc:'Fed favori enflasyon ölçüsü (PCE)' },
+      { date:'2026-03-27', time:'15:30', name:'PCE Fiyat Endeksi', impact:'critical', desc:'Fed enflasyon hedefi — çok önemli' },
+      { date:'2026-03-28', time:'17:00', name:'Michigan Tüketici Güveni', impact:'medium', desc:'Tüketici harcama eğilimi' },
+      { date:'2026-04-01', time:'17:00', name:'ISM İmalat PMI', impact:'high', desc:'ABD imalat sektörü durumu' },
+      { date:'2026-04-03', time:'17:00', name:'ISM Hizmet PMI', impact:'high', desc:'ABD hizmet sektörü' },
+      { date:'2026-04-04', time:'15:30', name:'🔴🔴 Tarım Dışı İstihdam (NFP)', impact:'critical', desc:'Aylık istihdam raporu — en yüksek volatilite' },
+      { date:'2026-04-04', time:'15:30', name:'İşsizlik Oranı', impact:'critical', desc:'ABD işsizlik' },
+      { date:'2026-04-10', time:'15:30', name:'TÜFE (CPI)', impact:'critical', desc:'Tüketici enflasyonu — Fed kararlarını etkiler' },
+      { date:'2026-04-16', time:'15:30', name:'Perakende Satışlar', impact:'high', desc:'Tüketici harcamaları' },
+      { date:'2026-04-30', time:'21:00', name:'🔴🔴🔴 FOMC Faiz Kararı', impact:'critical', desc:'Fed faiz açıklaması' },
+      { date:'2026-04-30', time:'21:30', name:'FOMC Basın Toplantısı', impact:'critical', desc:'Powell konuşması' },
+    ];
+    // Daily recurring
+    const dailyEvents=[];
+    const today=new Date();
+    for(let d=0;d<30;d++){
+      const dt=new Date(today.getTime()+d*86400000);
+      const day=dt.toISOString().slice(0,10);
+      const dow=dt.getDay();
+      if(dow===0||dow===6) continue;
+      dailyEvents.push({ date:day, time:'08:00', name:'Asya Seans Kapanış', impact:'low', desc:'Kısa volatilite' });
+      dailyEvents.push({ date:day, time:'16:30', name:'ABD Piyasa Açılış', impact:'low', desc:'NYSE açılış — hacim artışı' });
+    }
+    return [...events,...dailyEvents].sort((a,b)=>new Date(`${a.date}T${a.time}`)-new Date(`${b.date}T${b.time}`));
+  }
+  isInNoTradeZone(now=new Date()) {
+    const buf=CFG.NEWS_BUFFER_MINUTES*60000;
+    for(const ev of this.events){
+      if(ev.impact!=='high'&&ev.impact!=='critical') continue;
+      const t=new Date(`${ev.date}T${ev.time}`).getTime();
+      const start=t-buf, end=t+(ev.impact==='critical'?buf*2:buf);
+      if(now.getTime()>=start&&now.getTime()<=end) return{blocked:true,event:ev,endsAt:new Date(end)};
+    }
+    return{blocked:false};
+  }
+  getUpcoming(count=8) {
+    const now=Date.now();
+    return this.events.filter(e=>new Date(`${e.date}T${e.time}`).getTime()>now-3600000).slice(0,count);
+  }
+}
+
+// ===================== SOUND =====================
+function playSignalSound(dir) {
+  if(!CFG.SOUND_ENABLED) return;
+  try {
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = dir==='LONG' ? 880 : 440;
+    osc.type = dir==='LONG' ? 'sine' : 'square';
+    gain.gain.value = 0.3;
+    osc.start(); osc.stop(ctx.currentTime+0.3);
+    // Second beep
+    setTimeout(()=>{
+      const o2=ctx.createOscillator(), g2=ctx.createGain();
+      o2.connect(g2); g2.connect(ctx.destination);
+      o2.frequency.value = dir==='LONG' ? 1100 : 330;
+      o2.type = dir==='LONG' ? 'sine' : 'square';
+      g2.gain.value = 0.3;
+      o2.start(); o2.stop(ctx.currentTime+0.4);
+    }, 200);
+  } catch(e) {}
+}
+
+// ===================== APP =====================
+class App {
+  constructor() {
+    this.api = new DataAPI();
+    this.signal = new SignalEngine();
+    this.calendar = new EconomicCalendar();
+    this.chart = null;
+    this.candleSeries = null;
+    this.klines = [];
+    this.htfKlines = [];
+    this._lastSignal = null;
+    this._priceThrottle = 0;
+    this._srLines = [];
+    this._trendLines = [];
+    this._targetLines = [];
+  }
+
+  async init() {
+    this.initChart();
+
+    this.api.onPrice = (p) => this.onPrice(p);
+    this.api.onKline = (k) => this.onKline(k);
+    this.api.onConnect = () => {
+      document.getElementById('connDot').className='conn-dot on';
+      const src = this.api._source || 'Binance';
+      document.getElementById('connStatus').textContent=src + ' Bağlı';
+      this.log(`${src} WebSocket bağlandı — canlı veri akıyor`, 'green');
+    };
+    this.api.onDisconnect = () => {
+      document.getElementById('connDot').className='conn-dot off';
+      document.getElementById('connStatus').textContent='Bağlantı Yok';
+    };
+    this.api.connect();
+
+    // Load klines
+    const k = await this.api.getKlines(CFG.TF, 500);
+    if(k.length){
+      this.klines=k;
+      this.candleSeries.setData(k);
+      this.log(`${k.length} mum yüklendi (${CFG.TF})`, 'blue');
+    }
+
+    // Load 4H klines for multi-TF
+    this.htfKlines = await this.api.getKlines('4h', 200);
+    if(this.htfKlines.length) this.log(`4H verisi yüklendi (${this.htfKlines.length} mum)`, 'blue');
+
+    // Start analysis
+    this._analysisInterval = setInterval(() => this.runAnalysis(), CFG.SIGNAL_CHECK_MS);
+    this.runAnalysis();
+
+    // Market data + whale refresh
+    this._marketInterval = setInterval(() => { this.updateMarketData(); this.updateWhalePanel(); }, 30000);
+    this.updateMarketData();
+    this.updateWhalePanel();
+
+    // Calendar
+    this.renderCalendar();
+    setInterval(() => this.renderCalendar(), 60000);
+
+    // Stale watchdog
+    setInterval(() => {
+      if(this.api._lastDataTime && Date.now()-this.api._lastDataTime > 30000){
+        this.log('30sn veri yok — yeniden bağlanılıyor...', 'red');
+        this.api.reconnect();
+      }
+    }, 10000);
+
+    // Visibility API
+    document.addEventListener('visibilitychange', () => {
+      if(!document.hidden){
+        if(!this.api.connected || Date.now()-this.api._lastDataTime>15000){
+          this.api.reconnect();
+          this.log('Tab aktif — bağlantı yenilendi', 'blue');
+        }
+      }
+    });
+
+    // Proactive reconnect 23h
+    setTimeout(() => { this.api.reconnect(); this.log('23h proaktif reconnect','blue'); }, 23*3600000);
+
+    // HTF refresh every 15min
+    setInterval(async () => {
+      this.htfKlines = await this.api.getKlines('4h', 200);
+    }, 900000);
+  }
+
+  initChart() {
+    const container = document.getElementById('chartContainer');
+    this.chart = LightweightCharts.createChart(container, {
+      width: container.clientWidth, height: 420,
+      layout: { background: { type:'solid', color:'transparent' }, textColor:'rgba(255,255,255,.4)', fontSize:11 },
+      grid: { vertLines:{ color:'rgba(255,255,255,.04)' }, horzLines:{ color:'rgba(255,255,255,.04)' } },
+      crosshair: { mode:0 },
+      timeScale: { timeVisible:true, secondsVisible:false, borderColor:'rgba(255,255,255,.08)' },
+      rightPriceScale: { borderColor:'rgba(255,255,255,.08)' }
+    });
+    this.candleSeries = this.chart.addCandlestickSeries({
+      upColor:'#34c759', downColor:'#ff3b30',
+      wickUpColor:'#34c759', wickDownColor:'#ff3b30',
+      borderVisible:false
+    });
+    new ResizeObserver(() => {
+      this.chart.applyOptions({ width: container.clientWidth });
+    }).observe(container);
+  }
+
+  onPrice(price) {
+    const now = Date.now();
+    if(now - this._priceThrottle < 100) return;
+    this._priceThrottle = now;
+    const el = document.getElementById('livePrice');
+    el.textContent = '$' + price.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+    // Flash color
+    if(this._lastPrice){
+      el.style.color = price>this._lastPrice ? 'var(--green)' : price<this._lastPrice ? 'var(--red)' : 'var(--text)';
+      setTimeout(()=>el.style.color='var(--text)', 500);
+    }
+    this._lastPrice = price;
+  }
+
+  onKline(kline) {
+    if(!this.klines.length) return;
+    const last = this.klines[this.klines.length-1];
+    if(kline.time === last.time){
+      Object.assign(last, kline);
+    } else {
+      this.klines.push(kline);
+      if(this.klines.length>1000) this.klines.shift();
+    }
+    this.candleSeries.update(kline);
+  }
+
+  async runAnalysis() {
+    if(this.klines.length<200) return;
+    const t0 = performance.now();
+    const result = this.signal.analyze(this.klines, this.htfKlines);
+    const ms = (performance.now()-t0).toFixed(0);
+
+    document.getElementById('analysisTimer').textContent=`${ms}ms | #${this.signal._analysisCount}`;
+    document.getElementById('analysisCount').textContent = this.signal._analysisCount;
+
+    // Update indicators panel
+    this.updateIndicators(result);
+    // Update S/R panel
+    this.updateSRPanel(result);
+    // Update chart lines
+    this.updateChartLines(result);
+
+    // Check news
+    const ntz = this.calendar.isInNoTradeZone();
+    if(ntz.blocked){
+      document.getElementById('newsAlert').innerHTML=`<span style="color:var(--red)">⛔ ${ntz.event.name}</span>`;
+      document.getElementById('signalDir').textContent='HABER — BEKLE';
+      document.getElementById('signalBox').className='signal-alert';
+      return;
+    } else {
+      document.getElementById('newsAlert').textContent='';
+    }
+
+    // Update signal display
+    this.updateSignalDisplay(result);
+
+    // 3x confirmation
+    const confirmed = this.signal.checkConfirmation(result);
+    const confs = this.signal._confirmations.filter(c=>c.dir===result.direction).length;
+    const confText = result.direction!=='BEKLE' ? `Onay: ${Math.min(confs,3)}/3 ${result.direction}` : 'Onay: 0/3';
+    document.getElementById('signalConfirm').textContent = confText;
+    document.getElementById('confirmStatus').textContent = result.direction!=='BEKLE' ? `${Math.min(confs,3)}/3` : '0/3';
+
+    if(confirmed){
+      this.onConfirmedSignal(confirmed, result);
+    }
+  }
+
+  onConfirmedSignal(confirmed, fullResult) {
+    const dir = confirmed.direction;
+    const score = confirmed.score;
+    playSignalSound(dir);
+
+    // Big alert
+    const box = document.getElementById('signalBox');
+    box.className = `signal-alert signal-${dir.toLowerCase()} signal-active`;
+
+    // Log
+    const price = this.api.price;
+    const tp1 = fullResult.tp1 ? fullResult.tp1.toFixed(2) : '--';
+    const tp2 = fullResult.tp2 ? fullResult.tp2.toFixed(2) : '--';
+    const sl = fullResult.stopLoss ? fullResult.stopLoss.toFixed(2) : '--';
+    this.log(`🚨 ${dir} SİNYALİ ONAYLANDI! Skor:${score} | Fiyat:$${price.toFixed(2)} | TP1:$${tp1} TP2:$${tp2} | SL:$${sl}`, dir==='LONG'?'green':'red');
+
+    // Update targets
+    this.updateTargets(fullResult);
+
+    // Browser notification
+    if(Notification.permission==='granted'){
+      new Notification(`CASH MAKER: ${dir} SİNYALİ!`, { body:`Skor:${score} | $${price.toFixed(2)}`, icon:'💰' });
+    } else if(Notification.permission!=='denied'){
+      Notification.requestPermission();
+    }
+  }
+
+  updateSignalDisplay(result) {
+    const scoreEl = document.getElementById('signalScore');
+    const dirEl = document.getElementById('signalDir');
+    const box = document.getElementById('signalBox');
+    const timeEl = document.getElementById('signalTime');
+    const reasonsEl = document.getElementById('signalReasons');
+
+    scoreEl.textContent = result.score;
+    dirEl.textContent = result.direction;
+    timeEl.textContent = new Date().toLocaleTimeString('tr-TR');
+
+    if(result.direction==='LONG'){
+      box.className='signal-alert signal-long';
+      scoreEl.style.color='var(--green)';
+      dirEl.style.color='var(--green)';
+    } else if(result.direction==='SHORT'){
+      box.className='signal-alert signal-short';
+      scoreEl.style.color='var(--red)';
+      dirEl.style.color='var(--red)';
+    } else {
+      box.className='signal-alert';
+      scoreEl.style.color='var(--text2)';
+      dirEl.style.color='var(--text2)';
+    }
+
+    // Signal reasons
+    const ind = result.indicators || {};
+    let html = `<div style="margin-bottom:8px"><strong>LONG: ${result.longScore||0}</strong> | <strong>SHORT: ${result.shortScore||0}</strong></div>`;
+    if(result.reasons){
+      html += result.reasons.map(r=>`<div style="padding:2px 0;border-left:2px solid ${result.direction==='LONG'?'var(--green)':'var(--red)'};padding-left:8px;margin:2px 0">${r}</div>`).join('');
+    }
+    if(ind.htfTrend){
+      const c=ind.htfTrend==='UP'?'var(--green)':ind.htfTrend==='DOWN'?'var(--red)':'var(--text2)';
+      html+=`<div style="margin-top:6px;padding:4px 8px;background:rgba(255,255,255,.03);border-radius:6px">4H Trend: <strong style="color:${c}">${ind.htfTrend}</strong></div>`;
+    }
+    reasonsEl.innerHTML = html;
+
+    // Trend badge
+    const badge = document.getElementById('trendBadge');
+    if(ind.htfTrend==='UP'){badge.className='trend-badge trend-up';badge.textContent='YUKARI';}
+    else if(ind.htfTrend==='DOWN'){badge.className='trend-badge trend-down';badge.textContent='AŞAĞI';}
+    else{badge.className='trend-badge trend-neutral';badge.textContent='YATAY';}
+
+    // Update targets if signal exists
+    if(result.direction!=='BEKLE') this.updateTargets(result);
+  }
+
+  updateTargets(result) {
+    const el = document.getElementById('priceTargets');
+    if(!result.tp1){ el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text2);font-size:12px">Sinyal bekleniyor...</div>'; return; }
+    const price = result.price || this.api.price;
+    const isLong = result.direction === 'LONG';
+    const arrow = isLong ? '↑' : '↓';
+    const color = isLong ? 'var(--green)' : 'var(--red)';
+
+    const pctDist = (target) => ((target - price) / price * 100).toFixed(2);
+    const pnlCalc = (target) => {
+      const diff = Math.abs(target - price);
+      const pnl = (diff / price) * CFG.LEVERAGE * 100;
+      return pnl.toFixed(1);
+    };
+
+    let html = '';
+    // TP targets
+    html += `<div class="level-row level-target" style="border-left-color:${color}"><span class="level-label">${arrow} Hedef 1 (1.5R)</span><span class="level-price" style="color:${color}">$${result.tp1.toFixed(2)}</span><span class="level-dist green">+%${pnlCalc(result.tp1)}</span></div>`;
+    html += `<div class="level-row level-target" style="border-left-color:${color}"><span class="level-label">${arrow} Hedef 2 (2.5R)</span><span class="level-price" style="color:${color}">$${result.tp2.toFixed(2)}</span><span class="level-dist green">+%${pnlCalc(result.tp2)}</span></div>`;
+    html += `<div class="level-row level-target" style="border-left-color:${color}"><span class="level-label">${arrow} Hedef 3 (4R)</span><span class="level-price" style="color:${color}">$${result.tp3.toFixed(2)}</span><span class="level-dist green">+%${pnlCalc(result.tp3)}</span></div>`;
+    // SL
+    html += `<div class="level-row" style="background:rgba(255,23,68,.08);border-left:3px solid var(--red)"><span class="level-label">✋ Stop Loss</span><span class="level-price" style="color:var(--red)">$${result.stopLoss.toFixed(2)}</span><span class="level-dist red">${pctDist(result.stopLoss)}%</span></div>`;
+    // R:R ratio
+    const reward = Math.abs(result.tp2 - price);
+    const risk = Math.abs(price - result.stopLoss);
+    const rr = (reward/risk).toFixed(1);
+    html += `<div style="text-align:center;margin-top:8px;font-size:12px;color:var(--text2)">R:R Oranı: <strong style="color:${+rr>=2?'var(--green)':'var(--orange)'}">1:${rr}</strong> | ATR: <span class="mono">$${(result.atr||0).toFixed(2)}</span></div>`;
+
+    // Channel projection
+    const ind = result.indicators;
+    if(ind && ind.channel){
+      const ch = ind.channel;
+      html += `<div style="margin-top:10px;padding:8px;background:var(--glass);border-radius:8px;font-size:11px">`;
+      html += `<div style="color:var(--purple);font-weight:700;margin-bottom:4px">📐 TREND KANALI</div>`;
+      html += `<div>Trend: <strong style="color:${ch.trend==='UP'?'var(--green)':ch.trend==='DOWN'?'var(--red)':'var(--text2)'}">${ch.trend==='UP'?'YUKARI':ch.trend==='DOWN'?'AŞAĞI':'YATAY'}</strong></div>`;
+      html += `<div>Kanal Üst: <span class="mono">$${ch.channelHigh.toFixed(2)}</span></div>`;
+      html += `<div>Kanal Alt: <span class="mono">$${ch.channelLow.toFixed(2)}</span></div>`;
+      html += `<div>Tahmini Üst: <span class="mono green">$${ch.projHigh.toFixed(2)}</span></div>`;
+      html += `<div>Tahmini Alt: <span class="mono red">$${ch.projLow.toFixed(2)}</span></div>`;
+      html += `</div>`;
+    }
+
+    el.innerHTML = html;
+  }
+
+  updateSRPanel(result) {
+    const el = document.getElementById('srLevels');
+    const ind = result.indicators;
+    if(!ind || !ind.sr) { el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text2);font-size:12px">Hesaplanıyor...</div>'; return; }
+    const price = this.api.price || (this.klines.length ? this.klines[this.klines.length-1].close : 0);
+    const sr = ind.sr;
+    let html = '';
+
+    // Resistances (above price)
+    const resAbove = sr.resistances.filter(r=>r.price>price).sort((a,b)=>a.price-b.price).slice(0,4);
+    for(const r of resAbove){
+      const dist = ((r.price-price)/price*100).toFixed(2);
+      html += `<div class="level-row level-resistance"><span class="level-label">Direnç (${r.touches}x dokunma)</span><span class="level-price">$${r.price.toFixed(2)}</span><span class="level-dist red">+${dist}%</span></div>`;
+    }
+
+    // Current price
+    html += `<div class="level-row" style="background:rgba(41,121,255,.1);border-left:3px solid var(--blue)"><span class="level-label" style="color:var(--blue);font-weight:700">📍 Şu An</span><span class="level-price" style="color:var(--blue)">$${price.toFixed(2)}</span><span class="level-dist">--</span></div>`;
+
+    // Supports (below price)
+    const supBelow = sr.supports.filter(s=>s.price<price).sort((a,b)=>b.price-a.price).slice(0,4);
+    for(const s of supBelow){
+      const dist = ((price-s.price)/price*100).toFixed(2);
+      html += `<div class="level-row level-support"><span class="level-label">Destek (${s.touches}x dokunma)</span><span class="level-price">$${s.price.toFixed(2)}</span><span class="level-dist green">-${dist}%</span></div>`;
+    }
+
+    if(!resAbove.length && !supBelow.length) html='<div style="text-align:center;padding:16px;color:var(--text2);font-size:12px">Yeterli S/R seviyesi bulunamadı</div>';
+
+    el.innerHTML = html;
+  }
+
+  updateChartLines(result) {
+    const ind = result.indicators;
+    if(!ind) return;
+
+    // Remove old lines
+    this._srLines.forEach(l => { try{this.candleSeries.removePriceLine(l);}catch(e){} });
+    this._srLines = [];
+
+    // S/R lines on chart
+    if(ind.sr){
+      const price = this.api.price;
+      const resAbove = ind.sr.resistances.filter(r=>r.price>price).sort((a,b)=>a.price-b.price).slice(0,2);
+      const supBelow = ind.sr.supports.filter(s=>s.price<price).sort((a,b)=>b.price-a.price).slice(0,2);
+
+      for(const r of resAbove){
+        const line = this.candleSeries.createPriceLine({ price:r.price, color:'rgba(255,23,68,.5)', lineWidth:1, lineStyle:2, axisLabelVisible:true, title:`R ${r.touches}x` });
+        this._srLines.push(line);
+      }
+      for(const s of supBelow){
+        const line = this.candleSeries.createPriceLine({ price:s.price, color:'rgba(0,230,118,.5)', lineWidth:1, lineStyle:2, axisLabelVisible:true, title:`S ${s.touches}x` });
+        this._srLines.push(line);
+      }
+    }
+
+    // TP/SL lines
+    this._targetLines.forEach(l => { try{this.candleSeries.removePriceLine(l);}catch(e){} });
+    this._targetLines = [];
+    if(result.tp1 && result.direction !== 'BEKLE'){
+      this._targetLines.push(this.candleSeries.createPriceLine({ price:result.tp1, color:'rgba(0,122,255,.6)', lineWidth:1, lineStyle:1, axisLabelVisible:true, title:'TP1' }));
+      this._targetLines.push(this.candleSeries.createPriceLine({ price:result.tp2, color:'rgba(0,122,255,.4)', lineWidth:1, lineStyle:1, axisLabelVisible:true, title:'TP2' }));
+      this._targetLines.push(this.candleSeries.createPriceLine({ price:result.stopLoss, color:'rgba(255,59,48,.7)', lineWidth:1, lineStyle:1, axisLabelVisible:true, title:'SL' }));
+    }
+
+    // Paralel Kanal — ÇAPRAZ çizgiler (diagonal trend lines)
+    if(ind && ind.channel && ind.channel.highLinePoints){
+      // Eski kanal serilerini kaldır
+      if(this._channelHighSeries) { try{this.chart.removeSeries(this._channelHighSeries);}catch(e){} }
+      if(this._channelLowSeries) { try{this.chart.removeSeries(this._channelLowSeries);}catch(e){} }
+      if(this._channelMidSeries) { try{this.chart.removeSeries(this._channelMidSeries);}catch(e){} }
+
+      const ch = ind.channel;
+
+      // Üst kanal çizgisi (yeşil, kalın)
+      this._channelHighSeries = this.chart.addLineSeries({
+        color: 'rgba(52,199,89,.7)', lineWidth: 2, lineStyle: 0,
+        lastValueVisible: false, priceLineVisible: false,
+        crosshairMarkerVisible: false
+      });
+      this._channelHighSeries.setData(ch.highLinePoints);
+
+      // Alt kanal çizgisi (yeşil, kalın)
+      this._channelLowSeries = this.chart.addLineSeries({
+        color: 'rgba(52,199,89,.7)', lineWidth: 2, lineStyle: 0,
+        lastValueVisible: false, priceLineVisible: false,
+        crosshairMarkerVisible: false
+      });
+      this._channelLowSeries.setData(ch.lowLinePoints);
+
+      // Orta çizgi (yeşil, ince, kesikli)
+      this._channelMidSeries = this.chart.addLineSeries({
+        color: 'rgba(52,199,89,.3)', lineWidth: 1, lineStyle: 2,
+        lastValueVisible: false, priceLineVisible: false,
+        crosshairMarkerVisible: false
+      });
+      this._channelMidSeries.setData(ch.midLinePoints);
+    }
+  }
+
+  updateIndicators(result) {
+    const ind = result.indicators || {};
+    const el = document.getElementById('indGrid');
+    const rsi = ind.rsi || 50;
+    const macdH = ind.macd ? ind.macd.histogram : 0;
+    const bbPos = ind.bbPos || 0.5;
+    const vol = ind.vol || 1;
+    const atr = ind.atr || 0;
+    const div = ind.divergence || {};
+
+    el.innerHTML = `
+      <div class="ind-item"><div class="ind-name">RSI (14)</div><div class="ind-value" style="color:${rsi<40?'var(--green)':rsi>65?'var(--red)':'var(--text)'}">${rsi.toFixed(1)}</div></div>
+      <div class="ind-item"><div class="ind-name">MACD Hist</div><div class="ind-value" style="color:${macdH>0?'var(--green)':'var(--red)'}">${macdH.toFixed(2)}</div></div>
+      <div class="ind-item"><div class="ind-name">BB Pozisyon</div><div class="ind-value" style="color:${bbPos<0.35?'var(--green)':bbPos>0.65?'var(--red)':'var(--text)'}">${(bbPos*100).toFixed(0)}%</div></div>
+      <div class="ind-item"><div class="ind-name">Hacim</div><div class="ind-value" style="color:${vol>1.2?'var(--yellow)':'var(--text)'}">${vol.toFixed(2)}x</div></div>
+      <div class="ind-item"><div class="ind-name">ATR</div><div class="ind-value mono">$${atr.toFixed(2)}</div></div>
+      <div class="ind-item"><div class="ind-name">Divergence</div><div class="ind-value" style="color:${div.bullish?'var(--green)':div.bearish?'var(--red)':'var(--text2)'}">${div.bullish?'BULL':div.bearish?'BEAR':'—'}</div></div>
+    `;
+
+    // Volatility
+    const price = this.api.price || 1;
+    document.getElementById('volatility').textContent = (atr/price*100).toFixed(2)+'%';
+  }
+
+  async updateMarketData() {
+    const el = document.getElementById('marketData');
+    const [funding, oi, lsRatio] = await Promise.all([
+      this.api.getFundingRate(),
+      this.api.getOpenInterest(),
+      this.api.getLongShortRatio()
+    ]);
+
+    let html = '';
+
+    // Funding Rate
+    if(funding !== null){
+      const pct = (funding*100).toFixed(4);
+      const color = funding>0.01?'var(--red)':funding<-0.01?'var(--green)':'var(--text2)';
+      const sentiment = funding>0.01?'Çok LONG (düşüş riski)':funding<-0.01?'Çok SHORT (yükseliş riski)':'Dengeli';
+      html += `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Funding Rate</span><span class="mono" style="color:${color}">${pct}%</span></div><div style="font-size:10px;color:var(--text3)">${sentiment}</div></div>`;
+    }
+
+    // Open Interest
+    if(oi !== null){
+      const oiFormatted = oi > 1000 ? (oi/1000).toFixed(1)+'K' : oi.toFixed(0);
+      html += `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Open Interest</span><span class="mono">${oiFormatted} BTC</span></div></div>`;
+    }
+
+    // Long/Short Ratio
+    if(lsRatio !== null){
+      const longPct = (lsRatio/(1+lsRatio)*100).toFixed(1);
+      const shortPct = (100-longPct).toFixed(1);
+      const color = +longPct>60?'var(--green)':+longPct<40?'var(--red)':'var(--text2)';
+      html += `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Long/Short</span><span class="mono" style="color:${color}">${longPct}% / ${shortPct}%</span></div>`;
+      html += `<div class="metric-bar"><div class="metric-fill" style="width:${longPct}%;background:linear-gradient(90deg,var(--green),var(--red))"></div></div>`;
+      html += `<div style="font-size:10px;color:var(--text3)">${+longPct>65?'Çoğunluk LONG — ters hareket riski':+longPct<35?'Çoğunluk SHORT — sıkışma riski':'Dengeli'}</div></div>`;
+    }
+
+    if(!html) html='<div style="color:var(--text2);font-size:12px">Veriler yükleniyor...</div>';
+    el.innerHTML = html;
+  }
+
+  renderCalendar() {
+    const events = this.calendar.getUpcoming(10);
+    const container = document.getElementById('calendarEvents');
+    const alertEl = document.getElementById('noTradeAlert');
+
+    const ntz = this.calendar.isInNoTradeZone();
+    if(ntz.blocked){
+      alertEl.innerHTML=`<div class="no-trade-zone">⛔ <strong>İŞLEM YAPILMAYACAK</strong><br>${ntz.event.name}<br><span class="mono">${ntz.endsAt.toLocaleTimeString('tr-TR')}</span> tarihine kadar</div>`;
+    } else {
+      const nextHigh=events.find(e=>e.impact==='high'||e.impact==='critical');
+      if(nextHigh){
+        const diff=new Date(`${nextHigh.date}T${nextHigh.time}`).getTime()-Date.now();
+        if(diff>0&&diff<4*3600000){
+          const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000);
+          alertEl.innerHTML=`<div class="no-trade-zone" style="border-color:var(--orange)">⚠️ <strong>DİKKAT</strong>: ${nextHigh.name}<br>${h}s ${m}dk sonra</div>`;
+        } else alertEl.innerHTML='';
+      } else alertEl.innerHTML='';
+    }
+
+    container.innerHTML = events.map(e => {
+      const cls = (e.impact==='critical'||e.impact==='high')?'cal-high':e.impact==='medium'?'cal-med':'cal-low';
+      const impactText=e.impact==='critical'?'KRİTİK':e.impact==='high'?'YÜKSEK':e.impact==='medium'?'ORTA':'DÜŞÜK';
+      const impactColor=(e.impact==='critical'||e.impact==='high')?'var(--red)':e.impact==='medium'?'var(--orange)':'var(--blue)';
+      const dateStr=new Date(`${e.date}T${e.time}`).toLocaleDateString('tr-TR',{weekday:'short',month:'short',day:'numeric'});
+      return `<div class="cal-event ${cls}"><span style="color:var(--text2);min-width:42px;font-size:10px">${e.time}<br><span style="font-size:9px">${dateStr}</span></span><span style="flex:1">${e.name}<br><span style="font-size:10px;color:var(--text2)">${e.desc}</span></span><span style="font-size:9px;font-weight:700;color:${impactColor}">${impactText}</span></div>`;
+    }).join('');
+  }
+
+  async updateWhalePanel() {
+    const el = document.getElementById('whalePanel');
+    const [whale, topTrader] = await Promise.all([
+      this.api.getWhaleActivity(),
+      this.api.getTopTraderPositions()
+    ]);
+    this._whaleData = whale;
+    this._topTraderData = topTrader;
+
+    let html = '';
+
+    if (whale) {
+      const buyPct = (whale.buyRatio*100).toFixed(1);
+      const sellPct = (whale.sellRatio*100).toFixed(1);
+      const color = whale.signal==='LONG'?'var(--green)':whale.signal==='SHORT'?'var(--red)':'var(--text2)';
+      const trendIcon = whale.trend==='ALIM_ARTIYOR' ? '📈' : '📉';
+      const trendText = whale.trend==='ALIM_ARTIYOR' ? 'Alım artıyor' : 'Satım artıyor';
+
+      html += `<div style="margin-bottom:10px">`;
+      html += `<div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--text2)">Taker Alım/Satım</span><span style="font-weight:700;color:${color}">${whale.signal}</span></div>`;
+      html += `<div class="metric-bar" style="margin:6px 0"><div class="metric-fill" style="width:${buyPct}%;background:linear-gradient(90deg,var(--green) ${buyPct}%,var(--red) ${buyPct}%)"></div></div>`;
+      html += `<div style="display:flex;justify-content:space-between;font-size:11px"><span class="green">Alım: ${buyPct}%</span><span class="red">Satım: ${sellPct}%</span></div>`;
+      html += `<div style="font-size:10px;color:var(--text3);margin-top:4px">${trendIcon} ${trendText}</div>`;
+      html += `</div>`;
+    }
+
+    if (topTrader) {
+      const longColor = +topTrader.longRatio > 55 ? 'var(--green)' : 'var(--text)';
+      html += `<div style="margin-bottom:6px">`;
+      html += `<div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Top Trader Pozisyonları</span></div>`;
+      html += `<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><span style="color:var(--green)">LONG: ${topTrader.longRatio}%</span><span style="color:var(--red)">SHORT: ${topTrader.shortRatio}%</span></div>`;
+      const warning = +topTrader.longRatio > 65 ? '⚠️ Çoğunluk LONG — sıkışma riski' : +topTrader.shortRatio > 65 ? '⚠️ Çoğunluk SHORT — short squeeze riski' : '✅ Dengeli';
+      html += `<div style="font-size:10px;color:var(--text3);margin-top:4px">${warning}</div>`;
+      html += `</div>`;
+    }
+
+    if (!whale && !topTrader) html = '<div style="text-align:center;padding:12px;color:var(--text2)">Balina verisi alınamadı</div>';
+    el.innerHTML = html;
+  }
+
+  async switchTF(tf) {
+    CFG.TF = tf;
+    document.getElementById('tfSelect').value = tf;
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.range-btn').forEach(b => { if(b.textContent.includes(tf==='1m'?'1dk':tf==='5m'?'5dk':tf==='15m'?'15dk':tf==='1h'?'1sa':tf==='4h'?'4sa':'1G')) b.classList.add('active'); });
+
+    // Reload klines
+    const k = await this.api.getKlines(tf, 500);
+    if(k.length){
+      this.klines = k;
+      this.candleSeries.setData(k);
+      this.log(`${tf} zaman dilimi — ${k.length} mum yüklendi`, 'blue');
+    }
+
+    // Reconnect WS with new TF
+    this.api.reconnect();
+  }
+
+  setConfidence(v) { CFG.MIN_CONFIDENCE = v; this.log(`Min güven: ${v}`, 'blue'); }
+  setLeverage(v) { CFG.LEVERAGE = v; this.log(`Kaldıraç: ${v}x`, 'blue'); }
+  setDirection(v) { CFG.DIRECTION = v; this.log(`Yön: ${v}`, 'blue'); }
+  toggleSound() {
+    CFG.SOUND_ENABLED = !CFG.SOUND_ENABLED;
+    document.getElementById('btnSound').textContent = CFG.SOUND_ENABLED ? '🔔' : '🔕';
+    this.log(`Ses: ${CFG.SOUND_ENABLED?'AÇIK':'KAPALI'}`, 'blue');
+  }
+
+  log(msg, color='text2') {
+    const el = document.getElementById('logArea');
+    const time = new Date().toLocaleTimeString('tr-TR');
+    const colorMap = { green:'var(--green)', red:'var(--red)', blue:'var(--blue)', orange:'var(--orange)', text2:'var(--text2)' };
+    el.innerHTML = `<div style="padding:3px 6px;border-left:2px solid ${colorMap[color]||colorMap.text2};margin:1px 0"><span class="mono" style="color:var(--text3)">${time}</span> ${msg}</div>` + el.innerHTML;
+    if(el.children.length > 100) el.removeChild(el.lastChild);
+  }
+}
+
+// ===================== DRAGGABLE PANELS =====================
+function initDraggable() {
+  const containers = document.querySelectorAll('.container > div');
+  containers.forEach(col => {
+    const cards = col.querySelectorAll('.card');
+    cards.forEach(card => {
+      card.draggable = true;
+      card.addEventListener('dragstart', (e) => {
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        document.querySelectorAll('.card').forEach(c => c.style.borderTop = '');
+      });
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const dragging = document.querySelector('.dragging');
+        if (!dragging || dragging === card) return;
+        const rect = card.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) {
+          card.style.borderTop = '2px solid var(--blue)';
+          card.parentNode.insertBefore(dragging, card);
+        } else {
+          card.style.borderTop = '';
+          card.parentNode.insertBefore(dragging, card.nextSibling);
+        }
+      });
+      card.addEventListener('dragleave', () => {
+        card.style.borderTop = '';
+      });
+    });
+  });
+}
+
+// ===================== START =====================
+const app = new App();
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{app.init();initDraggable();});
+else {app.init();initDraggable();}
+
+// Request notification permission
+if('Notification' in window && Notification.permission==='default') Notification.requestPermission();
+
+// Register Service Worker for PWA
+if('serviceWorker' in navigator) navigator.serviceWorker.register('cm-sw.js').catch(()=>{});
+</script>
+</body>
+</html>
