@@ -1,6 +1,6 @@
 const CACHE_NAME = 'cashmaker-v1';
 const ASSETS = [
-  '/cash-maker.html',
+  './cash-maker.html',
   'https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js'
 ];
 
