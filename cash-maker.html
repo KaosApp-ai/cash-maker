@@ -1503,6 +1503,19 @@ class App {
 
 // ===================== DRAGGABLE PANELS =====================
 function initDraggable() {
+  // Mobilde tüm kartları tek parent'a taşı (böylece paneller arası drag çalışır)
+  if (window.innerWidth <= 768) {
+    const container = document.querySelector('.container');
+    const allCards = container.querySelectorAll('.card');
+    // İstenen mobil sıra: Sinyal, Grafik, Hedefler, Göstergeler, S/R, Detaylar, Piyasa, Balina, Takvim, Log
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+    allCards.forEach(card => wrapper.appendChild(card));
+    container.innerHTML = '';
+    container.appendChild(wrapper);
+    container.style.gridTemplateColumns = '1fr';
+  }
+
   const containers = document.querySelectorAll('.container > div');
   let dragEl = null, placeholder = null, startY = 0, startTop = 0;
 
