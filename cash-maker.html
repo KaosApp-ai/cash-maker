@@ -52,7 +52,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;ba
 .card{background:var(--card);border-radius:var(--r);padding:14px;border:1px solid var(--border);box-shadow:var(--shadow);cursor:grab;transition:box-shadow .2s}
 .card.dragging{box-shadow:0 8px 30px rgba(0,0,0,.15);opacity:.9;cursor:grabbing;z-index:50;-webkit-user-select:none;user-select:none}
 .card.dragging *{-webkit-user-select:none;user-select:none}
-.card-title{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;cursor:grab}
+.card-title{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;cursor:grab;-webkit-user-select:none;user-select:none}
+.card-title::before{content:'⠿ ';opacity:.3;font-size:12px}
+body.is-dragging,body.is-dragging *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
 
 /* Signal Alert */
 .signal-alert{border-radius:16px;padding:24px;text-align:center;border:2px solid var(--border);background:var(--glass);transition:all .4s;box-shadow:var(--shadow)}
@@ -1533,16 +1535,18 @@ function initDraggable() {
       });
       card.addEventListener('dragleave', () => { card.style.borderTop = ''; });
 
-      // Mobile touch drag — long press then move
+      // Mobile touch drag — sadece başlık (card-title) üzerinden sürükle
       let touchTimer = null, touchActive = false, lastTouchTarget = null;
-      card.addEventListener('touchstart', (e) => {
+      const titleEl = card.querySelector('.card-title');
+      if (!titleEl) return; // başlığı olmayan kart sürüklenemez
+      titleEl.style.touchAction = 'none'; // başlıkta scroll'u engelle
+      titleEl.addEventListener('touchstart', (e) => {
         touchTimer = setTimeout(() => {
           touchActive = true;
           dragEl = card;
           startY = e.touches[0].clientY;
           window.getSelection().removeAllRanges();
-          document.body.style.webkitUserSelect = 'none';
-          document.body.style.userSelect = 'none';
+          document.body.classList.add('is-dragging');
           card.classList.add('dragging');
           card.style.opacity = '0.7';
           card.style.boxShadow = '0 8px 30px rgba(0,0,0,.5)';
@@ -1598,8 +1602,7 @@ function initDraggable() {
         card.style.boxShadow = '';
         card.style.pointerEvents = '';
         card.classList.remove('dragging');
-        document.body.style.webkitUserSelect = '';
-        document.body.style.userSelect = '';
+        document.body.classList.remove('is-dragging');
         document.querySelectorAll('.card').forEach(c => { c.style.borderTop = ''; c.style.borderBottom = ''; });
         dragEl = null;
         touchActive = false;
@@ -1612,6 +1615,7 @@ function initDraggable() {
         card.style.boxShadow = '';
         card.style.pointerEvents = '';
         card.classList.remove('dragging');
+        document.body.classList.remove('is-dragging');
         document.querySelectorAll('.card').forEach(c => { c.style.borderTop = ''; c.style.borderBottom = ''; });
         dragEl = null;
         touchActive = false;
