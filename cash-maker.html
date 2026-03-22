@@ -1532,84 +1532,84 @@ function initDraggable() {
       });
       card.addEventListener('dragleave', () => { card.style.borderTop = ''; });
 
-      // Mobile touch drag
-      let touchTimer = null;
+      // Mobile touch drag — long press then move
+      let touchTimer = null, touchActive = false, lastTouchTarget = null;
       card.addEventListener('touchstart', (e) => {
-        // Long press to start drag (500ms)
         touchTimer = setTimeout(() => {
+          touchActive = true;
           dragEl = card;
           startY = e.touches[0].clientY;
-          const rect = card.getBoundingClientRect();
-          startTop = rect.top;
           card.classList.add('dragging');
-          card.style.position = 'relative';
-          card.style.zIndex = '999';
-          card.style.opacity = '0.8';
-          card.style.boxShadow = '0 8px 30px rgba(0,0,0,.4)';
-          // Haptic feedback
+          card.style.opacity = '0.7';
+          card.style.boxShadow = '0 8px 30px rgba(0,0,0,.5)';
+          card.style.pointerEvents = 'none'; // altındaki elemanları görmek için
           if (navigator.vibrate) navigator.vibrate(50);
-        }, 200);
+        }, 250);
       }, {passive: true});
 
       card.addEventListener('touchmove', (e) => {
-        if (!dragEl || dragEl !== card) { clearTimeout(touchTimer); return; }
+        if (!touchActive || dragEl !== card) { clearTimeout(touchTimer); return; }
         e.preventDefault();
         const touch = e.touches[0];
-        const dy = touch.clientY - startY;
-        card.style.transform = `translateY(${dy}px)`;
 
-        // Find card under finger
-        const elBelow = document.elementsFromPoint(touch.clientX, touch.clientY)
-          .find(el => el.classList.contains('card') && el !== dragEl);
-        document.querySelectorAll('.card').forEach(c => c.style.borderTop = '');
-        if (elBelow) {
-          const rect = elBelow.getBoundingClientRect();
-          const midY = rect.top + rect.height / 2;
-          if (touch.clientY < midY) {
-            elBelow.style.borderTop = '2px solid var(--blue)';
+        // Parmak altındaki kartı bul (sürüklenen kart pointerEvents:none olduğu için görünür)
+        const target = document.elementsFromPoint(touch.clientX, touch.clientY)
+          .find(el => el.classList && el.classList.contains('card') && el !== card);
+
+        // Önceki highlight'ı temizle
+        document.querySelectorAll('.card').forEach(c => { c.style.borderTop = ''; c.style.borderBottom = ''; });
+
+        if (target && target.parentNode === card.parentNode) {
+          lastTouchTarget = target;
+          const rect = target.getBoundingClientRect();
+          const mid = rect.top + rect.height / 2;
+          if (touch.clientY < mid) {
+            target.style.borderTop = '3px solid var(--blue)';
+          } else {
+            target.style.borderBottom = '3px solid var(--blue)';
           }
+        } else {
+          lastTouchTarget = null;
         }
       }, {passive: false});
 
-      card.addEventListener('touchend', () => {
+      card.addEventListener('touchend', (e) => {
         clearTimeout(touchTimer);
-        if (!dragEl || dragEl !== card) return;
-        // Find target
-        const rect = card.getBoundingClientRect();
-        const centerY = rect.top + rect.height / 2;
-        const allCards = [...card.parentNode.querySelectorAll('.card')];
-        let target = null;
-        for (const c of allCards) {
-          if (c === card) continue;
-          const r = c.getBoundingClientRect();
-          if (centerY < r.top + r.height / 2) { target = c; break; }
+        if (!touchActive || dragEl !== card) { touchActive = false; return; }
+
+        // Hedef kartın yanına taşı
+        if (lastTouchTarget && lastTouchTarget.parentNode === card.parentNode) {
+          const touch = e.changedTouches[0];
+          const rect = lastTouchTarget.getBoundingClientRect();
+          const mid = rect.top + rect.height / 2;
+          if (touch.clientY < mid) {
+            card.parentNode.insertBefore(card, lastTouchTarget);
+          } else {
+            card.parentNode.insertBefore(card, lastTouchTarget.nextSibling);
+          }
         }
-        // Reset styles
-        card.style.position = '';
-        card.style.zIndex = '';
-        card.style.transform = '';
+
+        // Reset
         card.style.opacity = '';
         card.style.boxShadow = '';
+        card.style.pointerEvents = '';
         card.classList.remove('dragging');
-        document.querySelectorAll('.card').forEach(c => c.style.borderTop = '');
-        // Move card
-        if (target) {
-          card.parentNode.insertBefore(card, target);
-        } else if (allCards.length > 0) {
-          card.parentNode.appendChild(card);
-        }
+        document.querySelectorAll('.card').forEach(c => { c.style.borderTop = ''; c.style.borderBottom = ''; });
         dragEl = null;
+        touchActive = false;
+        lastTouchTarget = null;
       });
 
       card.addEventListener('touchcancel', () => {
         clearTimeout(touchTimer);
-        if (dragEl === card) {
-          card.style.position = '';
-          card.style.zIndex = '';
-          card.style.transform = '';
-          card.classList.remove('dragging');
-          dragEl = null;
-        }
+        card.style.opacity = '';
+        card.style.boxShadow = '';
+        card.style.pointerEvents = '';
+        card.classList.remove('dragging');
+        document.querySelectorAll('.card').forEach(c => { c.style.borderTop = ''; c.style.borderBottom = ''; });
+        dragEl = null;
+        touchActive = false;
+        lastTouchTarget = null;
       });
     });
   });
