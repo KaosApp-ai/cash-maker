@@ -104,6 +104,41 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;ba
 /* Responsive */
 @media(max-width:1100px){.container{grid-template-columns:1fr}}
 
+/* Mobile */
+@media(max-width:768px){
+  .header{padding:8px 12px;gap:8px;flex-wrap:wrap}
+  .logo{font-size:16px}
+  .price-display{font-size:18px}
+  .stat{min-width:auto}
+  .stat-label{font-size:8px}
+  .stat-value{font-size:11px}
+  .controls{padding:6px 12px;gap:8px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .ctrl-group{font-size:11px;white-space:nowrap;flex-shrink:0}
+  .ctrl-select{font-size:11px;padding:4px 6px}
+  .ctrl-input{font-size:11px;padding:4px 6px;width:45px}
+  .container{padding:8px 10px;gap:8px}
+  .card{padding:10px;border-radius:10px}
+  .card-title{font-size:9px;margin-bottom:6px}
+  #chartContainer{min-height:280px!important}
+  .signal-alert{padding:14px;border-radius:12px}
+  .signal-score{font-size:36px}
+  .signal-dir{font-size:26px}
+  .ind-grid{grid-template-columns:repeat(3,1fr);gap:4px}
+  .ind-item{padding:6px}
+  .ind-name{font-size:8px}
+  .ind-value{font-size:12px}
+  .level-row{padding:6px 8px;font-size:11px}
+  .range-btn{padding:3px 7px;font-size:10px}
+  .log-area{max-height:150px;font-size:10px}
+  .cal-event{font-size:10px;padding:5px}
+}
+
+/* iPhone safe areas */
+@supports(padding: max(0px)) {
+  .header{padding-top:max(8px, env(safe-area-inset-top))}
+  body{padding-bottom:env(safe-area-inset-bottom)}
+}
+
 /* Alert Animation */
 @keyframes signalPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
 .signal-active{animation:signalPulse 1.5s ease-in-out infinite}
@@ -271,7 +306,7 @@ const CFG = {
   DIRECTION: 'BOTH',
   NEWS_BUFFER_MINUTES: 45,
   SOUND_ENABLED: true,
-  SIGNAL_CHECK_MS: 2000
+  SIGNAL_CHECK_MS: 1000
 };
 
 // ===================== DATA API (Binance) =====================
@@ -948,7 +983,7 @@ class App {
   initChart() {
     const container = document.getElementById('chartContainer');
     this.chart = LightweightCharts.createChart(container, {
-      width: container.clientWidth, height: 420,
+      width: container.clientWidth, height: window.innerWidth < 768 ? 280 : 420,
       layout: { background: { type:'solid', color:'transparent' }, textColor:'rgba(255,255,255,.4)', fontSize:11 },
       grid: { vertLines:{ color:'rgba(255,255,255,.04)' }, horzLines:{ color:'rgba(255,255,255,.04)' } },
       crosshair: { mode:0 },
