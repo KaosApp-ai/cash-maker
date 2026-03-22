@@ -607,7 +607,7 @@ class Indicators {
     };
     return { supports: cluster(sups), resistances: cluster(ress) };
   }
-  static TrendChannel(klines, period=50) {
+  static TrendChannel(klines, period=80) {
     const slice=klines.slice(-period);
     if (slice.length<15) return null;
     const n=slice.length;
@@ -968,6 +968,7 @@ class App {
     if(k.length){
       this.klines=k;
       this.candleSeries.setData(k);
+      this.chart.timeScale().scrollToRealTime();
       this.log(`${k.length} mum yüklendi (${CFG.TF})`, 'blue');
     }
 
@@ -1456,16 +1457,27 @@ class App {
     document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.range-btn').forEach(b => { if(b.textContent.includes(tf==='1m'?'1dk':tf==='5m'?'5dk':tf==='15m'?'15dk':tf==='1h'?'1sa':tf==='4h'?'4sa':'1G')) b.classList.add('active'); });
 
+    // Eski çizgileri temizle
+    this._srLines.forEach(l => { try{this.candleSeries.removePriceLine(l);}catch(e){} }); this._srLines=[];
+    this._targetLines.forEach(l => { try{this.candleSeries.removePriceLine(l);}catch(e){} }); this._targetLines=[];
+    if(this._channelHighSeries){try{this.chart.removeSeries(this._channelHighSeries);}catch(e){}} this._channelHighSeries=null;
+    if(this._channelLowSeries){try{this.chart.removeSeries(this._channelLowSeries);}catch(e){}} this._channelLowSeries=null;
+    if(this._channelMidSeries){try{this.chart.removeSeries(this._channelMidSeries);}catch(e){}} this._channelMidSeries=null;
+
     // Reload klines
     const k = await this.api.getKlines(tf, 500);
     if(k.length){
       this.klines = k;
       this.candleSeries.setData(k);
+      this.chart.timeScale().scrollToRealTime();
       this.log(`${tf} zaman dilimi — ${k.length} mum yüklendi`, 'blue');
     }
 
     // Reconnect WS with new TF
     this.api.reconnect();
+
+    // Yeni TF için hemen analiz çalıştır
+    setTimeout(() => this.runAnalysis(), 500);
   }
 
   setConfidence(v) { CFG.MIN_CONFIDENCE = v; this.log(`Min güven: ${v}`, 'blue'); }
@@ -1532,9 +1544,11 @@ function initDraggable() {
           card.classList.add('dragging');
           card.style.position = 'relative';
           card.style.zIndex = '999';
+          card.style.opacity = '0.8';
+          card.style.boxShadow = '0 8px 30px rgba(0,0,0,.4)';
           // Haptic feedback
           if (navigator.vibrate) navigator.vibrate(50);
-        }, 400);
+        }, 200);
       }, {passive: true});
 
       card.addEventListener('touchmove', (e) => {
@@ -1574,6 +1588,8 @@ function initDraggable() {
         card.style.position = '';
         card.style.zIndex = '';
         card.style.transform = '';
+        card.style.opacity = '';
+        card.style.boxShadow = '';
         card.classList.remove('dragging');
         document.querySelectorAll('.card').forEach(c => c.style.borderTop = '');
         // Move card
