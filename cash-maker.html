@@ -603,49 +603,78 @@ class Indicators {
   }
   static TrendChannel(klines, period=50) {
     const slice=klines.slice(-period);
-    if (slice.length<10) return null;
+    if (slice.length<15) return null;
     const n=slice.length;
-    const regress = (vals) => {
-      let sx=0,sy=0,sxx=0,sxy=0;
-      for (let i=0;i<n;i++){sx+=i;sy+=vals[i];sxx+=i*i;sxy+=i*vals[i];}
-      const slope=(n*sxy-sx*sy)/(n*sxx-sx*sx);
-      const intercept=(sy-slope*sx)/n;
-      return { slope, intercept, start: intercept, end: intercept+slope*(n-1) };
-    };
-    const highReg=regress(slice.map(k=>k.high));
-    const lowReg=regress(slice.map(k=>k.low));
-    const price=slice[slice.length-1].close;
-    const channelHigh=highReg.end;
-    const channelLow=lowReg.end;
-    const channelMid=(channelHigh+channelLow)/2;
-    const posInChannel=(price-channelLow)/(channelHigh-channelLow);
-    const trend=highReg.slope>0&&lowReg.slope>0?'UP':highReg.slope<0&&lowReg.slope<0?'DOWN':'RANGE';
 
-    // Çapraz çizgi noktaları (chart'a çizmek için time+value çiftleri)
-    const timeStep = slice.length > 1 ? slice[1].time - slice[0].time : 900; // candle interval in seconds
-    const highLinePoints = [];
-    const lowLinePoints = [];
-    const midLinePoints = [];
-    for (let i = 0; i < n; i++) {
-      highLinePoints.push({ time: slice[i].time, value: highReg.intercept + highReg.slope * i });
-      lowLinePoints.push({ time: slice[i].time, value: lowReg.intercept + lowReg.slope * i });
-      midLinePoints.push({ time: slice[i].time, value: (highReg.intercept + lowReg.intercept)/2 + (highReg.slope + lowReg.slope)/2 * i });
+    // Swing High'ları bul (en az 2 mum sağ-sol daha düşük)
+    const swingHighs=[], swingLows=[];
+    for(let i=3;i<n-3;i++){
+      const h=slice[i].high;
+      if(h>=slice[i-1].high&&h>=slice[i-2].high&&h>=slice[i-3].high&&h>=slice[i+1].high&&h>=slice[i+2].high) swingHighs.push({idx:i,price:h,time:slice[i].time});
+      const l=slice[i].low;
+      if(l<=slice[i-1].low&&l<=slice[i-2].low&&l<=slice[i-3].low&&l<=slice[i+1].low&&l<=slice[i+2].low) swingLows.push({idx:i,price:l,time:slice[i].time});
     }
-    // Projeksiyon — 15 mum ileriye
-    for (let j = 1; j <= 15; j++) {
-      const futureTime = slice[n-1].time + timeStep * j;
-      highLinePoints.push({ time: futureTime, value: highReg.end + highReg.slope * j });
-      lowLinePoints.push({ time: futureTime, value: lowReg.end + lowReg.slope * j });
-      midLinePoints.push({ time: futureTime, value: (highReg.end + lowReg.end)/2 + (highReg.slope + lowReg.slope)/2 * j });
+
+    // En az 2 swing point lazım
+    if(swingHighs.length<2&&swingLows.length<2) return null;
+
+    // Son 2 swing high'ı birleştir → üst çizgi
+    const fitLine = (points) => {
+      if(points.length<2) return null;
+      const p1=points[points.length-2], p2=points[points.length-1];
+      const slope=(p2.price-p1.price)/(p2.idx-p1.idx);
+      return {slope, p1, p2};
+    };
+
+    const highLine=fitLine(swingHighs);
+    const lowLine=fitLine(swingLows);
+    if(!highLine&&!lowLine) return null;
+
+    // Çizgi noktalarını oluştur (baştan sona + 15 mum projeksiyon)
+    const timeStep = n>1 ? slice[1].time-slice[0].time : 900;
+    const makeLinePoints = (line) => {
+      if(!line) return [];
+      const pts=[];
+      // Çizgiyi başlangıçtan sona çiz
+      const startIdx=Math.max(0, line.p1.idx-5);
+      const endIdx=n-1+15; // 15 mum ileriye projeksiyon
+      for(let i=startIdx;i<=endIdx;i++){
+        const val=line.p1.price+line.slope*(i-line.p1.idx);
+        const time=i<n ? slice[i].time : slice[n-1].time+timeStep*(i-n+1);
+        pts.push({time, value:val});
+      }
+      return pts;
+    };
+
+    const highLinePoints=makeLinePoints(highLine);
+    const lowLinePoints=makeLinePoints(lowLine);
+    // Orta çizgi
+    const midLinePoints=[];
+    if(highLinePoints.length&&lowLinePoints.length){
+      const minLen=Math.min(highLinePoints.length,lowLinePoints.length);
+      for(let i=0;i<minLen;i++){
+        midLinePoints.push({time:highLinePoints[i].time,value:(highLinePoints[i].value+lowLinePoints[i].value)/2});
+      }
     }
+
+    const price=slice[n-1].close;
+    const activeHigh=highLine?highLine.p1.price+highLine.slope*(n-1-highLine.p1.idx):price;
+    const activeLow=lowLine?lowLine.p1.price+lowLine.slope*(n-1-lowLine.p1.idx):price;
+    const channelHigh=activeHigh;
+    const channelLow=activeLow;
+    const channelMid=(channelHigh+channelLow)/2;
+    const posInChannel=channelHigh!==channelLow?(price-channelLow)/(channelHigh-channelLow):0.5;
+
+    const hSlope=highLine?highLine.slope:0;
+    const lSlope=lowLine?lowLine.slope:0;
+    const trend=hSlope>0&&lSlope>0?'UP':hSlope<0&&lSlope<0?'DOWN':'RANGE';
 
     return {
-      trend, highReg, lowReg,
+      trend,
       channelHigh, channelLow, channelMid, posInChannel,
-      startTime: slice[0].time, endTime: slice[n-1].time,
-      projHigh: highReg.end + highReg.slope*15,
-      projLow: lowReg.end + lowReg.slope*15,
-      // Çizgi noktaları
+      startTime:slice[0].time, endTime:slice[n-1].time,
+      projHigh:channelHigh+(hSlope*15),
+      projLow:channelLow+(lSlope*15),
       highLinePoints, lowLinePoints, midLinePoints
     };
   }
@@ -1454,9 +1483,12 @@ class App {
 // ===================== DRAGGABLE PANELS =====================
 function initDraggable() {
   const containers = document.querySelectorAll('.container > div');
+  let dragEl = null, placeholder = null, startY = 0, startTop = 0;
+
   containers.forEach(col => {
     const cards = col.querySelectorAll('.card');
     cards.forEach(card => {
+      // Desktop drag
       card.draggable = true;
       card.addEventListener('dragstart', (e) => {
         card.classList.add('dragging');
@@ -1480,8 +1512,82 @@ function initDraggable() {
           card.parentNode.insertBefore(dragging, card.nextSibling);
         }
       });
-      card.addEventListener('dragleave', () => {
-        card.style.borderTop = '';
+      card.addEventListener('dragleave', () => { card.style.borderTop = ''; });
+
+      // Mobile touch drag
+      let touchTimer = null;
+      card.addEventListener('touchstart', (e) => {
+        // Long press to start drag (500ms)
+        touchTimer = setTimeout(() => {
+          dragEl = card;
+          startY = e.touches[0].clientY;
+          const rect = card.getBoundingClientRect();
+          startTop = rect.top;
+          card.classList.add('dragging');
+          card.style.position = 'relative';
+          card.style.zIndex = '999';
+          // Haptic feedback
+          if (navigator.vibrate) navigator.vibrate(50);
+        }, 400);
+      }, {passive: true});
+
+      card.addEventListener('touchmove', (e) => {
+        if (!dragEl || dragEl !== card) { clearTimeout(touchTimer); return; }
+        e.preventDefault();
+        const touch = e.touches[0];
+        const dy = touch.clientY - startY;
+        card.style.transform = `translateY(${dy}px)`;
+
+        // Find card under finger
+        const elBelow = document.elementsFromPoint(touch.clientX, touch.clientY)
+          .find(el => el.classList.contains('card') && el !== dragEl);
+        document.querySelectorAll('.card').forEach(c => c.style.borderTop = '');
+        if (elBelow) {
+          const rect = elBelow.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          if (touch.clientY < midY) {
+            elBelow.style.borderTop = '2px solid var(--blue)';
+          }
+        }
+      }, {passive: false});
+
+      card.addEventListener('touchend', () => {
+        clearTimeout(touchTimer);
+        if (!dragEl || dragEl !== card) return;
+        // Find target
+        const rect = card.getBoundingClientRect();
+        const centerY = rect.top + rect.height / 2;
+        const allCards = [...card.parentNode.querySelectorAll('.card')];
+        let target = null;
+        for (const c of allCards) {
+          if (c === card) continue;
+          const r = c.getBoundingClientRect();
+          if (centerY < r.top + r.height / 2) { target = c; break; }
+        }
+        // Reset styles
+        card.style.position = '';
+        card.style.zIndex = '';
+        card.style.transform = '';
+        card.classList.remove('dragging');
+        document.querySelectorAll('.card').forEach(c => c.style.borderTop = '');
+        // Move card
+        if (target) {
+          card.parentNode.insertBefore(card, target);
+        } else if (allCards.length > 0) {
+          card.parentNode.appendChild(card);
+        }
+        dragEl = null;
+      });
+
+      card.addEventListener('touchcancel', () => {
+        clearTimeout(touchTimer);
+        if (dragEl === card) {
+          card.style.position = '';
+          card.style.zIndex = '';
+          card.style.transform = '';
+          card.classList.remove('dragging');
+          dragEl = null;
+        }
       });
     });
   });
